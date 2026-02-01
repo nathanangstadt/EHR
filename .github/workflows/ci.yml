@@ -1,0 +1,23 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images
+        run: docker compose build
+      - name: Start dependencies
+        run: docker compose up -d db redis
+      - name: Run backend tests (docker compose)
+        run: docker compose run --rm -e AUTO_SEED=0 -e AUTO_MIGRATE=1 -e CELERY_TASK_ALWAYS_EAGER=1 api pytest -q
+      - name: Frontend build (optional)
+        run: docker compose run --rm web npm run build
+      - name: Shutdown
+        if: always()
+        run: docker compose down -v
+

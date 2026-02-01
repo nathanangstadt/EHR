@@ -1,0 +1,211 @@
+[
+  {
+    "id": "PatientSearchPanel",
+    "title": "Patient Search",
+    "description": "Search patients by name/MRN/birthdate.",
+    "requiredContext": {},
+    "inputs": { "query": { "type": "string" } },
+    "outputs": { "selectedPatientId": { "type": "string" } },
+    "capabilities": ["read", "inspect"],
+    "backendDependencies": ["FHIR"],
+    "allowedActions": ["fhir.search.Patient"]
+  },
+  {
+    "id": "PatientCreateForm",
+    "title": "Create Patient",
+    "description": "Create a new Patient via FHIR.",
+    "requiredContext": {},
+    "inputs": { "defaults": { "type": "object" } },
+    "outputs": { "createdPatientId": { "type": "string" } },
+    "capabilities": ["create"],
+    "backendDependencies": ["FHIR"],
+    "allowedActions": ["fhir.create.Patient"]
+  },
+  {
+    "id": "PatientSummaryCard",
+    "title": "Patient Summary",
+    "description": "Read-only summary of selected patient.",
+    "requiredContext": { "patientId": true },
+    "inputs": {},
+    "outputs": {},
+    "capabilities": ["read", "inspect"],
+    "backendDependencies": ["FHIR"],
+    "allowedActions": ["fhir.read.Patient"]
+  },
+  {
+    "id": "TimelineList",
+    "title": "Timeline",
+    "description": "Unified timeline of Encounters, Observations, Conditions, ServiceRequests.",
+    "requiredContext": { "patientId": true },
+    "inputs": {},
+    "outputs": { "selectedEventRef": { "type": "object" } },
+    "capabilities": ["read", "inspect"],
+    "backendDependencies": ["FHIR"],
+    "allowedActions": ["fhir.search.Encounter", "fhir.search.DocumentReference", "fhir.search.Observation", "fhir.search.Condition", "fhir.search.ServiceRequest"]
+  },
+  {
+    "id": "ClinicalEventDetailDrawer",
+    "title": "Event Detail",
+    "description": "FHIR view, SOM view, provenance/audit, and version history for Observation.",
+    "requiredContext": {},
+    "inputs": { "selectedEventRef": { "type": "object" } },
+    "outputs": {},
+    "capabilities": ["inspect"],
+    "backendDependencies": ["FHIR", "internal"],
+    "allowedActions": ["fhir.read.*", "internal.som", "internal.trace", "internal.observationVersions"]
+  },
+  {
+    "id": "PreAuthCreateWizard",
+    "title": "Pre-Auth Wizard",
+    "description": "Create a draft preauth request by selecting service request, diagnosis, and supporting evidence.",
+    "requiredContext": { "patientId": true },
+    "inputs": {},
+    "outputs": { "createdPreAuthId": { "type": "string" } },
+    "capabilities": ["create", "inspect"],
+    "backendDependencies": ["FHIR", "internal"],
+    "allowedActions": ["internal.preauth.create"]
+  },
+  {
+    "id": "PreAuthHistoryList",
+    "title": "Pre-Auth History",
+    "description": "Lists existing preauth requests for the active patient; selecting one loads it into context.",
+    "requiredContext": { "patientId": true },
+    "inputs": {},
+    "outputs": { "selectedPreAuthId": { "type": "string" } },
+    "capabilities": ["read", "inspect"],
+    "backendDependencies": ["internal"],
+    "allowedActions": ["internal.preauth.search", "internal.preauth.read"]
+  },
+  {
+    "id": "PreAuthRequestCard",
+    "title": "Pre-Auth Request",
+    "description": "Displays a preauth request.",
+    "requiredContext": { "preAuthId": true },
+    "inputs": {},
+    "outputs": {},
+    "capabilities": ["read", "inspect"],
+    "backendDependencies": ["internal"],
+    "allowedActions": ["internal.preauth.read", "internal.jobs.read"]
+  },
+  {
+    "id": "PreAuthPackageSnapshotViewer",
+    "title": "Package Snapshot",
+    "description": "Shows latest immutable snapshot JSON + checksum.",
+    "requiredContext": { "preAuthId": true },
+    "inputs": {},
+    "outputs": {},
+    "capabilities": ["inspect"],
+    "backendDependencies": ["internal"],
+    "allowedActions": ["internal.preauth.read", "internal.jobs.read"]
+  },
+  {
+    "id": "DecisionPanel",
+    "title": "Decision",
+    "description": "Shows latest payer decision.",
+    "requiredContext": { "preAuthId": true },
+    "inputs": {},
+    "outputs": {},
+    "capabilities": ["read", "inspect"],
+    "backendDependencies": ["internal"],
+    "allowedActions": ["internal.preauth.latestDecision", "internal.jobs.read"]
+  },
+  {
+    "id": "RequestedDocumentUploader",
+    "title": "Requested Document Uploader",
+    "description": "Creates a DocumentReference+Binary (e.g. Knee X-ray report) and attaches it to the active PreAuth.",
+    "requiredContext": { "preAuthId": true, "correlationId": true },
+    "inputs": {},
+    "outputs": {},
+    "capabilities": ["create", "update", "inspect"],
+    "backendDependencies": ["FHIR", "internal"],
+    "allowedActions": ["fhir.create.Binary", "fhir.create.DocumentReference", "internal.preauth.attachDocument"]
+  },
+  {
+    "id": "SubmitButtonWithJobStatus",
+    "title": "Submit Pre-Auth",
+    "description": "Submits preauth and polls job status.",
+    "requiredContext": { "preAuthId": true, "correlationId": true },
+    "inputs": {},
+    "outputs": { "jobId": { "type": "string" } },
+    "capabilities": ["submit", "inspect"],
+    "backendDependencies": ["internal"],
+    "allowedActions": ["internal.preauth.submit", "internal.preauth.resubmit", "internal.preauth.enqueueReview", "internal.jobs.read"]
+  },
+  {
+    "id": "JobList",
+    "title": "Jobs",
+    "description": "List jobs and select one.",
+    "requiredContext": {},
+    "inputs": {},
+    "outputs": { "selectedJobId": { "type": "string" } },
+    "capabilities": ["read", "inspect"],
+    "backendDependencies": ["internal"],
+    "allowedActions": ["internal.jobs.list"]
+  },
+  {
+    "id": "JobDetailPanel",
+    "title": "Job Detail",
+    "description": "Job status, progress, correlationId, outputs.",
+    "requiredContext": { "jobId": true },
+    "inputs": {},
+    "outputs": {},
+    "capabilities": ["inspect"],
+    "backendDependencies": ["internal"],
+    "allowedActions": ["internal.jobs.read"]
+  },
+  {
+    "id": "FHIRRequestComposer",
+    "title": "FHIR Request Composer",
+    "description": "Send ad-hoc FHIR requests and inspect responses.",
+    "requiredContext": {},
+    "inputs": {},
+    "outputs": {},
+    "capabilities": ["read", "create", "update", "inspect"],
+    "backendDependencies": ["FHIR"],
+    "allowedActions": ["fhir.*"]
+  },
+  {
+    "id": "MappingTraceViewer",
+    "title": "Mapping Trace",
+    "description": "Shows SOM writes, provenance and audit events from correlationId or resource id.",
+    "requiredContext": {},
+    "inputs": {},
+    "outputs": {},
+    "capabilities": ["inspect"],
+    "backendDependencies": ["internal"],
+    "allowedActions": ["internal.trace"]
+  },
+  {
+    "id": "AdminTools",
+    "title": "Admin Tools",
+    "description": "Dev-only reset + scenario generator for test data.",
+    "requiredContext": {},
+    "inputs": {},
+    "outputs": {},
+    "capabilities": ["create", "update", "inspect"],
+    "backendDependencies": ["internal", "FHIR"],
+    "allowedActions": ["internal.admin.reset", "internal.scenarios.templates", "internal.scenarios.create"]
+  },
+  {
+    "id": "PayerRuleSetEditor",
+    "title": "Payer Rule Set Editor",
+    "description": "View and update the active payer ruleset (stored in Postgres).",
+    "requiredContext": {},
+    "inputs": {},
+    "outputs": {},
+    "capabilities": ["read", "update", "inspect"],
+    "backendDependencies": ["internal"],
+    "allowedActions": ["payer.rules.get", "payer.rules.put"]
+  },
+  {
+    "id": "PayerPreAuthQueue",
+    "title": "Payer PreAuth Queue",
+    "description": "Lists preauth requests for a payer by status; selecting one sets app context.",
+    "requiredContext": {},
+    "inputs": {},
+    "outputs": {},
+    "capabilities": ["read", "inspect"],
+    "backendDependencies": ["internal"],
+    "allowedActions": ["internal.preauth.search"]
+  }
+]
