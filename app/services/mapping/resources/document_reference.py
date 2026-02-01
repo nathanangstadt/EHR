@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy import desc, select
 
-from app.db.models import SomBinary, SomDocument, SomPatient
+from app.db.models import SomBinary, SomDocument, SomEncounter, SomPatient
 from app.services.audit import AuditService
 from app.services.mapping.fhir_utils import bundle, fhir_meta, parse_reference, to_uuid
 from app.services.mapping.resources.base import BaseMapper
@@ -19,6 +19,21 @@ def _parse_dt(s: str) -> dt.datetime:
 
 class DocumentReferenceMapper(BaseMapper):
     resource_type = "DocumentReference"
+
+    def _parse_encounter_id(self, body: dict[str, Any]):
+        ctx = body.get("context") or {}
+        enc_list = ctx.get("encounter") or []
+        if isinstance(enc_list, dict):
+            enc_list = [enc_list]
+        if not isinstance(enc_list, list) or not enc_list:
+            return None
+        ref = (enc_list[0] or {}).get("reference")
+        if not ref:
+            return None
+        rt, rid = parse_reference(ref)
+        if rt != "Encounter":
+            raise ValueError("DocumentReference.context.encounter must reference Encounter")
+        return to_uuid(rid)
 
     def create(self, body: dict[str, Any], *, correlation_id: str | None) -> dict[str, Any]:
         if correlation_id:
@@ -52,6 +67,14 @@ class DocumentReferenceMapper(BaseMapper):
         doc_dt = _parse_dt(date_time) if date_time else None
         title = body.get("description") or body.get("title")
 
+        encounter_id = self._parse_encounter_id(body)
+        if encounter_id:
+            enc = self.db.get(SomEncounter, encounter_id)
+            if not enc:
+                raise ValueError("Encounter not found")
+            if enc.patient_id != patient.id:
+                raise ValueError("Encounter.patient must match DocumentReference.patient")
+
         # Resolve attachment: accept url=Binary/{id} or inline base64 data (handled by Binary POST first).
         content = (body.get("content") or [{}])[0]
         attachment = content.get("attachment") or {}
@@ -65,7 +88,7 @@ class DocumentReferenceMapper(BaseMapper):
         prov = ProvenanceService(self.db).create(activity="create", author=None, correlation_id=correlation_id)
         doc = SomDocument(
             patient_id=patient.id,
-            encounter_id=None,
+            encounter_id=encounter_id,
             status=status,
             type_concept_id=type_concept.id,
             date_time=doc_dt,
@@ -125,6 +148,16 @@ class DocumentReferenceMapper(BaseMapper):
         doc_dt = _parse_dt(date_time) if date_time else doc.date_time
         title = body.get("description") or body.get("title") or doc.title
 
+        encounter_id = doc.encounter_id
+        if body.get("context") is not None:
+            encounter_id = self._parse_encounter_id(body)
+            if encounter_id:
+                enc = self.db.get(SomEncounter, encounter_id)
+                if not enc:
+                    raise ValueError("Encounter not found")
+                if enc.patient_id != doc.patient_id:
+                    raise ValueError("Encounter.patient must match DocumentReference.patient")
+
         content = (body.get("content") or [{}])[0]
         attachment = content.get("attachment") or {}
         url = attachment.get("url")
@@ -148,6 +181,7 @@ class DocumentReferenceMapper(BaseMapper):
         doc.date_time = doc_dt
         doc.title = title
         doc.description = body.get("description") or doc.description
+        doc.encounter_id = encounter_id
         doc.version += 1
         doc.updated_provenance_id = prov.id
 
@@ -172,6 +206,10 @@ class DocumentReferenceMapper(BaseMapper):
         if patient:
             pid = patient.split("/")[-1]
             stmt = stmt.where(SomDocument.patient_id == to_uuid(pid))
+        encounter = params.get("encounter")
+        if encounter:
+            eid = encounter.split("/")[-1]
+            stmt = stmt.where(SomDocument.encounter_id == to_uuid(eid))
         date_param = params.get("date")
         if date_param:
             parts = date_param if isinstance(date_param, list) else [date_param]
@@ -215,6 +253,8 @@ class DocumentReferenceMapper(BaseMapper):
                 ]
             },
         }
+        if doc.encounter_id:
+            out["context"] = {"encounter": [{"reference": f"Encounter/{doc.encounter_id}"}]}
         if doc.date_time:
             out["date"] = doc.date_time.isoformat().replace("+00:00", "Z")
         if doc.description:

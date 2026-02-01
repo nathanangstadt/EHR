@@ -81,6 +81,9 @@ export function RequestedDocumentUploader({ context, onOutput }: any) {
           resourceType: "DocumentReference",
           status: "current",
           subject: { reference: `Patient/${preauth.patientId}` },
+          ...(preauth.encounterId
+            ? { context: { encounter: [{ reference: `Encounter/${preauth.encounterId}` }] } }
+            : {}),
           type: {
             coding: [
               {
