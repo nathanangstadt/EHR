@@ -12,6 +12,7 @@ export function emit(e: AppEvent) {
 
 export function subscribe(l: Listener) {
   listeners.add(l);
-  return () => listeners.delete(l);
+  return () => {
+    listeners.delete(l);
+  };
 }
-

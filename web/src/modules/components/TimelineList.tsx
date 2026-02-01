@@ -7,11 +7,14 @@ type EventRef = { resourceType: string; id: string };
 export function TimelineList({ context, onOutput }: any) {
   const [items, setItems] = useState<any[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let ok = true;
     async function run() {
       if (!context.patientId) return;
+      setLoading(true);
       setErr(null);
       try {
         const pid = context.patientId;
@@ -31,13 +34,15 @@ export function TimelineList({ context, onOutput }: any) {
         if (ok) setItems(merged);
       } catch (e: any) {
         if (ok) setErr(e.message);
+      } finally {
+        if (ok) setLoading(false);
       }
     }
     run();
     return () => {
       ok = false;
     };
-  }, [context.patientId]);
+  }, [context.patientId, context.encounterId, refreshTick]);
 
   const sorted = useMemo(() => {
     function getTime(it: any): number {
@@ -60,6 +65,12 @@ export function TimelineList({ context, onOutput }: any) {
 
   return (
     <div style={{ display: "grid", gap: 8 }}>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <div className="muted">{loading ? "Loading..." : `${sorted.length} items`}</div>
+        <button onClick={() => setRefreshTick((n) => n + 1)} disabled={loading}>
+          Refresh
+        </button>
+      </div>
       {sorted.map((it) => {
         const r = it.resource;
         const label =

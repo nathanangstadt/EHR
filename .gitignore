@@ -13,9 +13,9 @@ htmlcov/
 dist/
 build/
 node_modules/
+*.tsbuildinfo
 
 .DS_Store
 
 db_data/
 redis_data/
-
