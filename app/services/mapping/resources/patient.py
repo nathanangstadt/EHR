@@ -44,12 +44,20 @@ class PatientMapper(BaseMapper):
         )
         self.db.add(patient)
         self.db.flush()
+        ProvenanceService(self.db).set_target(
+            prov,
+            target_resource_type=self.resource_type,
+            target_resource_id=str(patient.id),
+            target_som_table="som_patient",
+            target_som_id=str(patient.id),
+        )
 
         out = self._to_fhir(patient)
         AuditService(self.db).emit(
             actor="system",
             operation="create",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type=self.resource_type,
             resource_id=patient.id,
             som_table="som_patient",
@@ -83,7 +91,15 @@ class PatientMapper(BaseMapper):
         birth_date = body.get("birthDate")
         bd = dt.date.fromisoformat(birth_date) if birth_date else None
 
-        prov = ProvenanceService(self.db).create(activity="update", author=None, correlation_id=correlation_id)
+        prov = ProvenanceService(self.db).create(
+            activity="update",
+            author=None,
+            correlation_id=correlation_id,
+            target_resource_type=self.resource_type,
+            target_resource_id=str(patient.id),
+            target_som_table="som_patient",
+            target_som_id=str(patient.id),
+        )
         patient.identifier_system = identifier.get("system")
         patient.identifier_value = identifier.get("value")
         patient.name_family = name.get("family")
@@ -98,6 +114,7 @@ class PatientMapper(BaseMapper):
             actor="system",
             operation="update",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type=self.resource_type,
             resource_id=patient.id,
             som_table="som_patient",

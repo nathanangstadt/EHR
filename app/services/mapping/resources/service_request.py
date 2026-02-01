@@ -73,6 +73,13 @@ class ServiceRequestMapper(BaseMapper):
         )
         self.db.add(sr)
         self.db.flush()
+        ProvenanceService(self.db).set_target(
+            prov,
+            target_resource_type=self.resource_type,
+            target_resource_id=str(sr.id),
+            target_som_table="som_service_request",
+            target_som_id=str(sr.id),
+        )
 
         self._sync_reasons(sr, body, provenance_id=prov.id)
         out = self._to_fhir(sr, concept_system=concept.code_system.system_uri, concept_code=concept.code, concept_display=concept.display)
@@ -80,6 +87,7 @@ class ServiceRequestMapper(BaseMapper):
             actor="system",
             operation="create",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type=self.resource_type,
             resource_id=sr.id,
             som_table="som_service_request",
@@ -122,7 +130,15 @@ class ServiceRequestMapper(BaseMapper):
                 raise ValueError("Encounter not found")
             if enc.patient_id != sr.patient_id:
                 raise ValueError("Encounter.patient must match ServiceRequest.patient")
-        prov = ProvenanceService(self.db).create(activity="update", author=None, correlation_id=correlation_id)
+        prov = ProvenanceService(self.db).create(
+            activity="update",
+            author=None,
+            correlation_id=correlation_id,
+            target_resource_type=self.resource_type,
+            target_resource_id=str(sr.id),
+            target_som_table="som_service_request",
+            target_som_id=str(sr.id),
+        )
         sr.code_concept_id = concept.id
         sr.status = body.get("status")
         sr.intent = body.get("intent")
@@ -138,6 +154,7 @@ class ServiceRequestMapper(BaseMapper):
             actor="system",
             operation="update",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type=self.resource_type,
             resource_id=sr.id,
             som_table="som_service_request",

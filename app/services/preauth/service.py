@@ -79,14 +79,29 @@ class PreAuthService:
         )
         self.db.add(pr)
         self.db.flush()
+        ProvenanceService(self.db).set_target(
+            prov,
+            target_resource_type="PreAuth",
+            target_resource_id=str(pr.id),
+            target_som_table="som_preauth_request",
+            target_som_id=str(pr.id),
+        )
 
-        self._status_change(pr.id, from_status=None, to_status="draft", changed_by="system", correlation_id=correlation_id)
+        self._status_change(
+            pr.id,
+            from_status=None,
+            to_status="draft",
+            changed_by="system",
+            correlation_id=correlation_id,
+            provenance_id=prov.id,
+        )
 
         out = self.get(str(pr.id)) or {"id": str(pr.id)}
         AuditService(self.db).emit(
             actor="system",
             operation="create",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type="PreAuth",
             resource_id=pr.id,
             som_table="som_preauth_request",
@@ -199,10 +214,25 @@ class PreAuthService:
         from_status = pr.status
         pr.status = new_status
         pr.version += 1
-        prov = ProvenanceService(self.db).create(activity=activity, author=None, correlation_id=correlation_id)
+        prov = ProvenanceService(self.db).create(
+            activity=activity,
+            author=None,
+            correlation_id=correlation_id,
+            target_resource_type="PreAuth",
+            target_resource_id=str(pr.id),
+            target_som_table="som_preauth_request",
+            target_som_id=str(pr.id),
+        )
         pr.updated_provenance_id = prov.id
 
-        self._status_change(pr.id, from_status=from_status, to_status=new_status, changed_by="system", correlation_id=correlation_id)
+        self._status_change(
+            pr.id,
+            from_status=from_status,
+            to_status=new_status,
+            changed_by="system",
+            correlation_id=correlation_id,
+            provenance_id=prov.id,
+        )
 
         # Snapshot should reflect the status being sent to payer (submitted/resubmitted), and include any
         # documents already attached at the time of this submission.
@@ -218,6 +248,7 @@ class PreAuthService:
             actor="system",
             operation=op,
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type="PreAuth",
             resource_id=pr.id,
             som_table="som_preauth_request",
@@ -332,11 +363,19 @@ class PreAuthService:
             if existing:
                 return {"id": str(existing.id), "preAuthId": str(pr.id), "documentId": str(doc.id), "role": role}
             raise
+        ProvenanceService(self.db).set_target(
+            prov,
+            target_resource_type="PreAuthSupportingDocument",
+            target_resource_id=str(link.id),
+            target_som_table="som_preauth_supporting_document",
+            target_som_id=str(link.id),
+        )
         out = {"id": str(link.id), "preAuthId": str(pr.id), "documentId": str(doc.id), "role": role}
         AuditService(self.db).emit(
             actor="system",
             operation="create",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type="PreAuthSupportingDocument",
             resource_id=link.id,
             som_table="som_preauth_supporting_document",
@@ -429,6 +468,7 @@ class PreAuthService:
                     "changedTime": r.changed_time.isoformat(),
                     "changedBy": r.changed_by,
                     "correlationId": r.correlation_id,
+                    "provenanceId": str(r.provenance_id) if getattr(r, "provenance_id", None) else None,
                 }
                 for r in rows
             ]
@@ -447,7 +487,16 @@ class PreAuthService:
         )
         return self._decision_dict(latest) if latest else None
 
-    def _status_change(self, preauth_id: uuid.UUID, *, from_status: str | None, to_status: str, changed_by: str, correlation_id: str | None) -> None:
+    def _status_change(
+        self,
+        preauth_id: uuid.UUID,
+        *,
+        from_status: str | None,
+        to_status: str,
+        changed_by: str,
+        correlation_id: str | None,
+        provenance_id: uuid.UUID | None,
+    ) -> None:
         row = SomPreAuthStatusHistory(
             preauth_request_id=preauth_id,
             from_status=from_status,
@@ -455,6 +504,7 @@ class PreAuthService:
             changed_time=dt.datetime.now(dt.timezone.utc),
             changed_by=changed_by,
             correlation_id=correlation_id,
+            provenance_id=provenance_id,
             extensions={},
         )
         self.db.add(row)
@@ -516,10 +566,18 @@ class PreAuthService:
         )
         self.db.add(snap)
         self.db.flush()
+        ProvenanceService(self.db).set_target(
+            prov,
+            target_resource_type="PreAuthPackageSnapshot",
+            target_resource_id=str(snap.id),
+            target_som_table="som_preauth_package_snapshot",
+            target_som_id=str(snap.id),
+        )
         AuditService(self.db).emit(
             actor="system",
             operation="create",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type="PreAuthPackageSnapshot",
             resource_id=snap.id,
             som_table="som_preauth_package_snapshot",

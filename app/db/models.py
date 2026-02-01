@@ -39,8 +39,18 @@ class SomProvenance(Base):
     recorded_time: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     activity: Mapped[str] = mapped_column(Text)
     author: Mapped[str | None] = mapped_column(Text, nullable=True)
+    agent_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    agent_display: Mapped[str | None] = mapped_column(Text, nullable=True)
+    agent_organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("som_organization.id"), nullable=True
+    )
     original_record_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
     correlation_id: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    target_resource_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    target_resource_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    target_som_table: Mapped[str | None] = mapped_column(Text, nullable=True)
+    target_som_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     extensions: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
 
 
@@ -56,6 +66,7 @@ class SomAuditEvent(Base):
     som_table: Mapped[str | None] = mapped_column(Text, nullable=True)
     som_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     correlation_id: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    provenance_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("som_provenance.id"), nullable=True)
     request_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     result_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     extensions: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
@@ -326,6 +337,7 @@ class SomPreAuthStatusHistory(Base):
     changed_time: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     changed_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     correlation_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    provenance_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("som_provenance.id"), nullable=True)
     extensions: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
 
 

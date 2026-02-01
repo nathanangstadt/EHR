@@ -53,12 +53,20 @@ class BinaryMapper(BaseMapper):
         )
         self.db.add(b)
         self.db.flush()
+        ProvenanceService(self.db).set_target(
+            prov,
+            target_resource_type=self.resource_type,
+            target_resource_id=str(b.id),
+            target_som_table="som_binary",
+            target_som_id=str(b.id),
+        )
 
         out = self._to_fhir(b, include_data=False)
         AuditService(self.db).emit(
             actor="system",
             operation="create",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type=self.resource_type,
             resource_id=b.id,
             som_table="som_binary",
@@ -87,7 +95,15 @@ class BinaryMapper(BaseMapper):
             b.size_bytes = len(data)
             b.sha256_hex = hashlib.sha256(data).hexdigest()
         b.content_type = str(content_type)
-        prov = ProvenanceService(self.db).create(activity="update", author=None, correlation_id=correlation_id)
+        prov = ProvenanceService(self.db).create(
+            activity="update",
+            author=None,
+            correlation_id=correlation_id,
+            target_resource_type=self.resource_type,
+            target_resource_id=str(b.id),
+            target_som_table="som_binary",
+            target_som_id=str(b.id),
+        )
         b.version += 1
         b.updated_provenance_id = prov.id
         out = self._to_fhir(b, include_data=False)
@@ -95,6 +111,7 @@ class BinaryMapper(BaseMapper):
             actor="system",
             operation="update",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type=self.resource_type,
             resource_id=b.id,
             som_table="som_binary",

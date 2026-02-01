@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import SomJob
 from app.services.audit import AuditService
+from app.services.provenance import ProvenanceService
 
 
 class JobService:
@@ -58,11 +59,21 @@ class JobService:
         )
         self.db.add(job)
         self.db.flush()
+        prov = ProvenanceService(self.db).create(
+            activity="create-job",
+            author="system",
+            correlation_id=correlation_id,
+            target_resource_type="Job",
+            target_resource_id=str(job.id),
+            target_som_table="som_job",
+            target_som_id=str(job.id),
+        )
 
         AuditService(self.db).emit(
             actor="system",
             operation="create",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type="Job",
             resource_id=job.id,
             som_table="som_job",

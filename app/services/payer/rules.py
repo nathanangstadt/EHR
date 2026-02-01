@@ -62,10 +62,18 @@ class PayerRuleService:
         )
         self.db.add(rs)
         self.db.flush()
+        ProvenanceService(self.db).set_target(
+            prov,
+            target_resource_type="PayerRuleSet",
+            target_resource_id=str(rs.id),
+            target_som_table="som_payer_rule_set",
+            target_som_id=str(rs.id),
+        )
         AuditService(self.db).emit(
             actor="payer-admin",
             operation="update",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type="PayerRuleSet",
             resource_id=rs.id,
             som_table="som_payer_rule_set",
@@ -87,4 +95,3 @@ class PayerRuleService:
             "version": rs.version,
             "updatedTime": rs.updated_time.isoformat(),
         }
-

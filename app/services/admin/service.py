@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.seed import seed
 from app.services.audit import AuditService
+from app.services.provenance import ProvenanceService
 
 
 class AdminService:
@@ -44,10 +45,17 @@ class AdminService:
                 self.db.commit()
 
             out = {"ok": True, "seeded": bool(seed_data), "seedResult": seed_result}
+            prov = ProvenanceService(self.db).create(
+                activity="reset",
+                author="system",
+                correlation_id=correlation_id,
+                target_resource_type="AdminReset",
+            )
             AuditService(self.db).emit(
                 actor="system",
                 operation="reset",
                 correlation_id=correlation_id,
+                provenance_id=prov.id,
                 resource_type="AdminReset",
                 resource_id=None,
                 som_table=None,
@@ -58,4 +66,3 @@ class AdminService:
             return out
         finally:
             self.db.execute(text("select pg_advisory_unlock(:id)"), {"id": lock_id})
-

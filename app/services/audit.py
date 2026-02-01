@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import SomAuditEvent
+from app.db.models import SomAuditEvent, SomProvenance
 
 
 class AuditService:
@@ -20,6 +20,7 @@ class AuditService:
         actor: str,
         operation: str,
         correlation_id: str | None,
+        provenance_id: uuid.UUID | None = None,
         resource_type: str | None,
         resource_id: uuid.UUID | None,
         som_table: str | None,
@@ -33,6 +34,7 @@ class AuditService:
             actor=actor,
             operation=operation,
             correlation_id=correlation_id,
+            provenance_id=provenance_id,
             resource_type=resource_type,
             resource_id=resource_id,
             som_table=som_table,
@@ -85,6 +87,11 @@ class AuditService:
             if rid:
                 stmt = stmt.where(SomAuditEvent.resource_id == rid)
         events = self.db.execute(stmt).scalars().all()
+        prov_ids = [e.provenance_id for e in events if e.provenance_id]
+        prov_map: dict[uuid.UUID, SomProvenance] = {}
+        if prov_ids:
+            provs = self.db.execute(select(SomProvenance).where(SomProvenance.id.in_(prov_ids))).scalars().all()
+            prov_map = {p.id: p for p in provs}
         return {
             "events": [
                 {
@@ -97,6 +104,30 @@ class AuditService:
                     "somTable": e.som_table,
                     "somId": str(e.som_id) if e.som_id else None,
                     "correlationId": e.correlation_id,
+                    "provenanceId": str(e.provenance_id) if e.provenance_id else None,
+                    "provenance": (
+                        {
+                            "id": str(prov_map[e.provenance_id].id),
+                            "recordedTime": prov_map[e.provenance_id].recorded_time.isoformat(),
+                            "activity": prov_map[e.provenance_id].activity,
+                            "author": prov_map[e.provenance_id].author,
+                            "sourceSystem": prov_map[e.provenance_id].source_system,
+                            "originalRecordRef": prov_map[e.provenance_id].original_record_ref,
+                            "correlationId": prov_map[e.provenance_id].correlation_id,
+                            "target": {
+                                "resourceType": prov_map[e.provenance_id].target_resource_type,
+                                "resourceId": str(prov_map[e.provenance_id].target_resource_id)
+                                if prov_map[e.provenance_id].target_resource_id
+                                else None,
+                                "somTable": prov_map[e.provenance_id].target_som_table,
+                                "somId": str(prov_map[e.provenance_id].target_som_id)
+                                if prov_map[e.provenance_id].target_som_id
+                                else None,
+                            },
+                        }
+                        if e.provenance_id in prov_map
+                        else None
+                    ),
                     "requestPayload": e.request_payload,
                     "resultPayload": e.result_payload,
                 }

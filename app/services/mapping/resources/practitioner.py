@@ -32,11 +32,19 @@ class PractitionerMapper(BaseMapper):
         pr = SomPractitioner(name=display, created_provenance_id=prov.id, updated_provenance_id=None, extensions={})
         self.db.add(pr)
         self.db.flush()
+        ProvenanceService(self.db).set_target(
+            prov,
+            target_resource_type=self.resource_type,
+            target_resource_id=str(pr.id),
+            target_som_table="som_practitioner",
+            target_som_id=str(pr.id),
+        )
         out = self._to_fhir(pr)
         AuditService(self.db).emit(
             actor="system",
             operation="create",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type=self.resource_type,
             resource_id=pr.id,
             som_table="som_practitioner",
@@ -54,7 +62,15 @@ class PractitionerMapper(BaseMapper):
         pr = self.db.get(SomPractitioner, to_uuid(id))
         if not pr:
             return None
-        prov = ProvenanceService(self.db).create(activity="update", author=None, correlation_id=correlation_id)
+        prov = ProvenanceService(self.db).create(
+            activity="update",
+            author=None,
+            correlation_id=correlation_id,
+            target_resource_type=self.resource_type,
+            target_resource_id=str(pr.id),
+            target_som_table="som_practitioner",
+            target_som_id=str(pr.id),
+        )
         name = (body.get("name") or [{}])[0]
         display = name.get("text") or " ".join((name.get("given") or []) + ([name.get("family")] if name.get("family") else []))
         pr.name = display
@@ -66,6 +82,7 @@ class PractitionerMapper(BaseMapper):
             actor="system",
             operation="update",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type=self.resource_type,
             resource_id=pr.id,
             som_table="som_practitioner",

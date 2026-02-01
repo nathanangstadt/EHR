@@ -78,12 +78,20 @@ class DocumentReferenceMapper(BaseMapper):
         )
         self.db.add(doc)
         self.db.flush()
+        ProvenanceService(self.db).set_target(
+            prov,
+            target_resource_type=self.resource_type,
+            target_resource_id=str(doc.id),
+            target_som_table="som_document",
+            target_som_id=str(doc.id),
+        )
 
         out = self._to_fhir(doc)
         AuditService(self.db).emit(
             actor="system",
             operation="create",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type=self.resource_type,
             resource_id=doc.id,
             som_table="som_document",
@@ -126,7 +134,15 @@ class DocumentReferenceMapper(BaseMapper):
                 raise ValueError("Binary not found for attachment.url")
             doc.binary_id = bid
 
-        prov = ProvenanceService(self.db).create(activity="update", author=None, correlation_id=correlation_id)
+        prov = ProvenanceService(self.db).create(
+            activity="update",
+            author=None,
+            correlation_id=correlation_id,
+            target_resource_type=self.resource_type,
+            target_resource_id=str(doc.id),
+            target_som_table="som_document",
+            target_som_id=str(doc.id),
+        )
         doc.status = status
         doc.type_concept_id = type_concept.id
         doc.date_time = doc_dt
@@ -140,6 +156,7 @@ class DocumentReferenceMapper(BaseMapper):
             actor="system",
             operation="update",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type=self.resource_type,
             resource_id=doc.id,
             som_table="som_document",

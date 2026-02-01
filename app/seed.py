@@ -323,8 +323,8 @@ def seed(db: Session) -> dict[str, str]:
 
     db.add_all(
         [
-            SomPreAuthStatusHistory(preauth_request_id=pa1.id, from_status=None, to_status="draft", changed_by="seed", correlation_id="seed", extensions={}),
-            SomPreAuthStatusHistory(preauth_request_id=pa2.id, from_status=None, to_status="draft", changed_by="seed", correlation_id="seed", extensions={}),
+            SomPreAuthStatusHistory(preauth_request_id=pa1.id, from_status=None, to_status="draft", changed_by="seed", correlation_id="seed", provenance_id=prov.id, extensions={}),
+            SomPreAuthStatusHistory(preauth_request_id=pa2.id, from_status=None, to_status="draft", changed_by="seed", correlation_id="seed", provenance_id=prov.id, extensions={}),
         ]
     )
 
@@ -346,7 +346,7 @@ def seed(db: Session) -> dict[str, str]:
     )
     db.add(pa3)
     db.flush()
-    db.add(SomPreAuthStatusHistory(preauth_request_id=pa3.id, from_status=None, to_status="submitted", changed_by="seed", correlation_id="seed", extensions={}))
+    db.add(SomPreAuthStatusHistory(preauth_request_id=pa3.id, from_status=None, to_status="submitted", changed_by="seed", correlation_id="seed", provenance_id=prov.id, extensions={}))
 
     PreAuthService(db)._create_snapshot(pa3, correlation_id="seed")
     dec_prov = ProvenanceService(db).create(activity="payer-determination", author="seed-payer", correlation_id="seed")
@@ -363,7 +363,7 @@ def seed(db: Session) -> dict[str, str]:
     )
     db.add(decision)
     pa3.status = "pending-info"
-    db.add(SomPreAuthStatusHistory(preauth_request_id=pa3.id, from_status="submitted", to_status="pending-info", changed_by="seed-payer", correlation_id="seed", extensions={}))
+    db.add(SomPreAuthStatusHistory(preauth_request_id=pa3.id, from_status="submitted", to_status="pending-info", changed_by="seed-payer", correlation_id="seed", provenance_id=dec_prov.id, extensions={}))
 
     # Seed payer-managed rules for "Acme Payer"
     PayerRuleService(db).upsert_active(

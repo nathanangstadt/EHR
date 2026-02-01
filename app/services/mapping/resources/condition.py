@@ -61,11 +61,19 @@ class ConditionMapper(BaseMapper):
         )
         self.db.add(c)
         self.db.flush()
+        ProvenanceService(self.db).set_target(
+            prov,
+            target_resource_type=self.resource_type,
+            target_resource_id=str(c.id),
+            target_som_table="som_condition",
+            target_som_id=str(c.id),
+        )
         out = self._to_fhir(c, concept_system=concept.code_system.system_uri, concept_code=concept.code, concept_display=concept.display)
         AuditService(self.db).emit(
             actor="system",
             operation="create",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type=self.resource_type,
             resource_id=c.id,
             som_table="som_condition",
@@ -100,7 +108,15 @@ class ConditionMapper(BaseMapper):
             clinical_status = body["clinicalStatus"]["coding"][0].get("code")
         onset = body.get("onsetDateTime") or body.get("onsetDate")
         onset_date = dt.date.fromisoformat(onset[:10]) if onset else None
-        prov = ProvenanceService(self.db).create(activity="update", author=None, correlation_id=correlation_id)
+        prov = ProvenanceService(self.db).create(
+            activity="update",
+            author=None,
+            correlation_id=correlation_id,
+            target_resource_type=self.resource_type,
+            target_resource_id=str(c.id),
+            target_som_table="som_condition",
+            target_som_id=str(c.id),
+        )
         c.code_concept_id = concept.id
         c.clinical_status = clinical_status
         c.onset_date = onset_date
@@ -112,6 +128,7 @@ class ConditionMapper(BaseMapper):
             actor="system",
             operation="update",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type=self.resource_type,
             resource_id=c.id,
             som_table="som_condition",

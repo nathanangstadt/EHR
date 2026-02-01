@@ -129,12 +129,20 @@ class ObservationMapper(BaseMapper):
         )
         self.db.add(obs)
         self.db.flush()
+        ProvenanceService(self.db).set_target(
+            prov,
+            target_resource_type=self.resource_type,
+            target_resource_id=str(obs.id),
+            target_som_table="som_observation",
+            target_som_id=str(obs.id),
+        )
         self._write_version(obs, provenance_id=prov.id)
         out = self._to_fhir(obs)
         AuditService(self.db).emit(
             actor="system",
             operation="create",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type=self.resource_type,
             resource_id=obs.id,
             som_table="som_observation",
@@ -207,7 +215,15 @@ class ObservationMapper(BaseMapper):
             value_type = "codeable_concept"
             vc_id = vc.id
 
-        prov = ProvenanceService(self.db).create(activity="update", author=None, correlation_id=correlation_id)
+        prov = ProvenanceService(self.db).create(
+            activity="update",
+            author=None,
+            correlation_id=correlation_id,
+            target_resource_type=self.resource_type,
+            target_resource_id=str(obs.id),
+            target_som_table="som_observation",
+            target_som_id=str(obs.id),
+        )
         obs.status = status
         obs.category = _category_from_fhir(body) or obs.category
         obs.code_concept_id = code_concept.id
@@ -227,6 +243,7 @@ class ObservationMapper(BaseMapper):
             actor="system",
             operation="update",
             correlation_id=correlation_id,
+            provenance_id=prov.id,
             resource_type=self.resource_type,
             resource_id=obs.id,
             som_table="som_observation",

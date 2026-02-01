@@ -106,6 +106,7 @@ def bulk_import_observations(job_id: str) -> dict[str, Any]:
             actor="worker",
             operation="create",
             correlation_id=job.correlation_id,
+            provenance_id=prov.id,
             resource_type="JobOutput",
             resource_id=job.id,
             som_table="som_job",
@@ -141,11 +142,29 @@ def submit_preauth(job_id: str) -> dict[str, Any]:
         from_status = pr.status
         pr.status = "in-review"
         pr.version += 1
-        PreAuthService(db)._status_change(pr.id, from_status=from_status, to_status="in-review", changed_by="payer-sim", correlation_id=job.correlation_id)
+        prov_review = ProvenanceService(db).create(
+            activity="payer-review",
+            author="payer-sim",
+            correlation_id=job.correlation_id,
+            target_resource_type="PreAuth",
+            target_resource_id=str(pr.id),
+            target_som_table="som_preauth_request",
+            target_som_id=str(pr.id),
+        )
+        pr.updated_provenance_id = prov_review.id
+        PreAuthService(db)._status_change(
+            pr.id,
+            from_status=from_status,
+            to_status="in-review",
+            changed_by="payer-sim",
+            correlation_id=job.correlation_id,
+            provenance_id=prov_review.id,
+        )
         AuditService(db).emit(
             actor="payer-sim",
             operation="update",
             correlation_id=job.correlation_id,
+            provenance_id=prov_review.id,
             resource_type="PreAuth",
             resource_id=pr.id,
             som_table="som_preauth_request",
@@ -252,7 +271,13 @@ def submit_preauth(job_id: str) -> dict[str, Any]:
         rationale = eval_out["rationale"]
         requested = eval_out.get("requestedAdditionalInfo") or []
 
-        prov = ProvenanceService(db).create(activity="payer-determination", author="payer-sim", correlation_id=job.correlation_id)
+        prov = ProvenanceService(db).create(
+            activity="payer-determination",
+            author="payer-sim",
+            correlation_id=job.correlation_id,
+            target_resource_type="PreAuthDecision",
+            target_som_table="som_preauth_decision",
+        )
         decision = SomPreAuthDecision(
             preauth_request_id=pr.id,
             decided_time=dt.datetime.now(dt.timezone.utc),
@@ -266,10 +291,18 @@ def submit_preauth(job_id: str) -> dict[str, Any]:
         )
         db.add(decision)
         db.flush()
+        ProvenanceService(db).set_target(
+            prov,
+            target_resource_type="PreAuthDecision",
+            target_resource_id=str(decision.id),
+            target_som_table="som_preauth_decision",
+            target_som_id=str(decision.id),
+        )
         AuditService(db).emit(
             actor="payer-sim",
             operation="create",
             correlation_id=job.correlation_id,
+            provenance_id=prov.id,
             resource_type="PreAuthDecision",
             resource_id=decision.id,
             som_table="som_preauth_decision",
@@ -286,11 +319,20 @@ def submit_preauth(job_id: str) -> dict[str, Any]:
         else:
             pr.status = "pending-info"
         pr.version += 1
-        PreAuthService(db)._status_change(pr.id, from_status=from_status2, to_status=pr.status, changed_by="payer-sim", correlation_id=job.correlation_id)
+        pr.updated_provenance_id = prov.id
+        PreAuthService(db)._status_change(
+            pr.id,
+            from_status=from_status2,
+            to_status=pr.status,
+            changed_by="payer-sim",
+            correlation_id=job.correlation_id,
+            provenance_id=prov.id,
+        )
         AuditService(db).emit(
             actor="payer-sim",
             operation="update",
             correlation_id=job.correlation_id,
+            provenance_id=prov.id,
             resource_type="PreAuth",
             resource_id=pr.id,
             som_table="som_preauth_request",
