@@ -3,12 +3,30 @@ import { apiFetch } from "../../api/client";
 import { emit } from "../../ui/eventBus";
 
 type EventRef = { resourceType: string; id: string };
+type Scope = "patient" | "encounter";
+
+function refId(reference?: string): string | undefined {
+  if (!reference) return undefined;
+  const parts = reference.split("/");
+  return parts[parts.length - 1] || undefined;
+}
+
+function encounterIdForResource(resourceType: string, r: any): string | undefined {
+  if (resourceType === "Encounter") return r?.id;
+  const direct = refId(r?.encounter?.reference);
+  if (direct) return direct;
+  // FHIR DocumentReference: context.encounter is typically an array of references.
+  const docEnc = r?.context?.encounter;
+  if (Array.isArray(docEnc) && docEnc.length) return refId(docEnc[0]?.reference);
+  return undefined;
+}
 
 export function TimelineList({ context, onOutput }: any) {
   const [items, setItems] = useState<any[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [scope, setScope] = useState<Scope>(context.encounterId ? "encounter" : "patient");
 
   useEffect(() => {
     let ok = true;
@@ -44,6 +62,10 @@ export function TimelineList({ context, onOutput }: any) {
     };
   }, [context.patientId, context.encounterId, refreshTick]);
 
+  useEffect(() => {
+    if (!context.encounterId && scope === "encounter") setScope("patient");
+  }, [context.encounterId, scope]);
+
   const sorted = useMemo(() => {
     function getTime(it: any): number {
       const r = it.resource;
@@ -57,8 +79,15 @@ export function TimelineList({ context, onOutput }: any) {
         r.meta?.lastUpdated;
       return dt ? Date.parse(dt) : 0;
     }
-    return [...items].sort((a, b) => getTime(b) - getTime(a));
-  }, [items]);
+    const all = [...items].sort((a, b) => getTime(b) - getTime(a));
+    if (scope !== "encounter" || !context.encounterId) return all;
+
+    const encId = context.encounterId;
+    return all.filter((it) => {
+      const id = encounterIdForResource(it.resourceType, it.resource);
+      return id === encId;
+    });
+  }, [items, scope, context.encounterId]);
 
   if (!context.patientId) return <div className="muted">Select a patient.</div>;
   if (err) return <div className="muted">{err}</div>;
@@ -66,10 +95,28 @@ export function TimelineList({ context, onOutput }: any) {
   return (
     <div style={{ display: "grid", gap: 8 }}>
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <div className="muted">{loading ? "Loading..." : `${sorted.length} items`}</div>
-        <button onClick={() => setRefreshTick((n) => n + 1)} disabled={loading}>
-          Refresh
-        </button>
+        <div className="row">
+          <span className="muted">{loading ? "Loading..." : `${sorted.length} items`}</span>
+          <select
+            value={scope}
+            onChange={(e) => setScope(e.target.value as Scope)}
+            disabled={!context.encounterId}
+            title={context.encounterId ? "Scope timeline to patient or active encounter" : "Set an active encounter to enable encounter scoping"}
+          >
+            <option value="patient">All encounters</option>
+            <option value="encounter">Active encounter only</option>
+          </select>
+        </div>
+        <div className="row">
+          {context.encounterId && scope === "encounter" && (
+            <button onClick={() => emit({ type: "setEncounterId", payload: { encounterId: undefined } })} disabled={loading}>
+              Clear Encounter
+            </button>
+          )}
+          <button onClick={() => setRefreshTick((n) => n + 1)} disabled={loading}>
+            Refresh
+          </button>
+        </div>
       </div>
       {sorted.map((it) => {
         const r = it.resource;
@@ -100,6 +147,9 @@ export function TimelineList({ context, onOutput }: any) {
             onClick={() => {
               const ref: EventRef = { resourceType: it.resourceType, id: r.id };
               emit({ type: "selectEventRef", payload: ref });
+              if (it.resourceType === "Encounter") {
+                emit({ type: "setEncounterId", payload: { encounterId: r.id } });
+              }
               onOutput?.({ selectedEventRef: ref });
             }}
             style={{ textAlign: "left", padding: 10, borderRadius: 10 }}

@@ -1,5 +1,6 @@
 export type AppEvent =
   | { type: "selectEventRef"; payload: { resourceType: string; id: string } }
+  | { type: "setEncounterId"; payload: { encounterId?: string } }
   | { type: "setJobId"; payload: { jobId?: string } }
   | { type: "setPreAuthId"; payload: { preAuthId?: string } };
 

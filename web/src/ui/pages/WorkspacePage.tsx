@@ -10,6 +10,7 @@ export function WorkspacePage() {
   useEffect(() => {
     return subscribe((e) => {
       if (e.type === "selectEventRef") setSelectedEventRef(e.payload);
+      if (e.type === "setEncounterId") dispatch({ type: "setEncounter", encounterId: e.payload.encounterId });
       if (e.type === "setJobId") dispatch({ type: "setJob", jobId: e.payload.jobId });
       if (e.type === "setPreAuthId") dispatch({ type: "setPreAuth", preAuthId: e.payload.preAuthId });
     });
@@ -46,4 +47,3 @@ export function WorkspacePage() {
     </div>
   );
 }
-
